@@ -3,6 +3,7 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/Databases2.iml" filepath="$PROJECT_DIR$/Databases2.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../../jfreechart-1.0.19/jfreechart-1.0.19.iml" filepath="$PROJECT_DIR$/../../jfreechart-1.0.19/jfreechart-1.0.19.iml" />
     </modules>
   </component>
 </project>

@@ -156,17 +156,22 @@ public class ETL {
             e.printStackTrace();
         }
         String mergeSQL = "MERGE INTO STUDENT_FACT target " +
-                "USING (SELECT ? AS STUDENT_ID, ? AS COURSE_ID, ? AS MODULE_ID, ? AS YEAR, ? AS BOOKSONLINE, ? AS HASSCHOLARSHIP FROM DUAL) source " +
+                "USING (SELECT ? AS STUDENT_ID, ? AS COURSE_ID, ? AS MODULE_ID, ? AS YEAR, ? AS BOOKSONLINE, ? AS HASSCHOLARSHIP, " +
+                "? AS ATTENDANCE, ? AS GRADE, ? AS ISDROPPEDOUT, ? AS ISEMPLOYED FROM DUAL) source " +
                 "ON (target.STUDENT_ID = source.STUDENT_ID) " +
                 "WHEN MATCHED THEN " +
                 "  UPDATE SET target.COURSE_ID = source.COURSE_ID, " +
                 "              target.MODULE_ID = source.MODULE_ID, " +
                 "              target.YEAR = source.YEAR, " +
                 "              target.BOOKSONLINE = source.BOOKSONLINE, " +
-                "              target.HASSCHOLARSHIP = source.HASSCHOLARSHIP " +
+                "              target.HASSCHOLARSHIP = source.HASSCHOLARSHIP, " +
+                "              target.ATTENDANCE = source.ATTENDANCE, " +
+                "              target.GRADE = source.GRADE, " +
+                "              target.ISDROPPEDOUT = source.ISDROPPEDOUT, " +
+                "              target.ISEMPLOYED = source.ISEMPLOYED " +
                 "WHEN NOT MATCHED THEN " +
-                "  INSERT (STUDENT_ID, COURSE_ID, MODULE_ID, YEAR, BOOKSONLINE, HASSCHOLARSHIP) " +
-                "  VALUES (source.STUDENT_ID, source.COURSE_ID, source.MODULE_ID, source.YEAR, source.BOOKSONLINE, source.HASSCHOLARSHIP)";
+                "  INSERT (STUDENT_ID, COURSE_ID, MODULE_ID, YEAR, BOOKSONLINE, HASSCHOLARSHIP, ATTENDANCE, GRADE, ISDROPPEDOUT, ISEMPLOYED) " +
+                "  VALUES (source.STUDENT_ID, source.COURSE_ID, source.MODULE_ID, source.YEAR, source.BOOKSONLINE, source.HASSCHOLARSHIP, source.ATTENDANCE, source.GRADE, source.ISDROPPEDOUT, source.ISEMPLOYED)";
 
         try (PreparedStatement mergeStatement = connection_STG.prepareStatement(mergeSQL);
              PreparedStatement admissionsStmt = connection_OP.prepareStatement(AdmissionsString);
@@ -185,17 +190,20 @@ public class ETL {
                 int yearJoinedInt = yearJoined.toLocalDate().getYear();
 
                 int moduleID = gradesRS.getInt("MODULE_ID");
+                int attendance = gradesRS.getInt("ATTENDANCE");
+                String grade = gradesRS.getString("GRADE");
+
                 boolean isOnline = booksRS.getBoolean("ISONLINE");
                 Date dateRetrieved = booksRS.getDate("DATERETRIEVED");
                 int yearRetrieved = dateRetrieved.toLocalDate().getYear();
 
-                // Retrieve scholarship information from studentsRS
                 boolean hasScholarship = studentsRS.getBoolean("HASSCHOLARSHIP");
-                char scholarshipChar;
-                if (hasScholarship)
-                    scholarshipChar = 'Y';
-                else
-                    scholarshipChar = 'N';
+                boolean isDroppedOut = studentsRS.getBoolean("ISDROPPEDOUT");
+                boolean isEmployed = studentsRS.getBoolean("ISEMPLOYED");
+
+                char scholarshipChar = hasScholarship ? 'Y' : 'N';
+                char droppedOutChar = isDroppedOut ? 'Y' : 'N';
+                char employedChar = isEmployed ? 'Y' : 'N';
 
                 mergeStatement.setInt(1, studentID);
                 mergeStatement.setInt(2, courseID);
@@ -203,6 +211,10 @@ public class ETL {
                 mergeStatement.setInt(4, yearJoinedInt);
                 mergeStatement.setBoolean(5, isOnline);
                 mergeStatement.setString(6, String.valueOf(scholarshipChar));
+                mergeStatement.setInt(7, attendance);
+                mergeStatement.setString(8, grade);
+                mergeStatement.setString(9, String.valueOf(droppedOutChar));
+                mergeStatement.setString(10, String.valueOf(employedChar));
                 mergeStatement.executeUpdate();
             }
         } catch (SQLException e) {
