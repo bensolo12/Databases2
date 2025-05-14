@@ -638,7 +638,33 @@ public class FrontEnd {
                 container.add(teacherComboBox);
                 container.revalidate();
                 container.repaint();
-
+            }
+            else if ("Employed Students Within 2 Years".equals(selectedReport)) {
+                container.removeAll();
+                JComboBox<String> departmentComboBox = new JComboBox<>();
+                departmentComboBox.addItem("Select Department");
+                try {
+                    ArrayList<Integer> departments = getDepartments();
+                    for (Integer department : departments) {
+                        departmentComboBox.addItem(department.toString());
+                    }
+                } catch (SQLException ex) {
+                    throw new RuntimeException(ex);
+                }
+                departmentComboBox.addActionListener(event -> {
+                    String selectedDepartment = (String) departmentComboBox.getSelectedItem();
+                    if (selectedDepartment != null && !selectedDepartment.equals("Select Department")) {
+                        int departmentId = Integer.parseInt(selectedDepartment);
+                        try {
+                            showEmploymentReport(mainFrame, departmentId);
+                        } catch (SQLException ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+                });
+                container.add(departmentComboBox);
+                container.revalidate();
+                container.repaint();
             }
         });
 
@@ -646,6 +672,68 @@ public class FrontEnd {
         container.add(reportsComboBox);
         container.add(logoutButton);
         return container;
+    }
+
+    private void showEmploymentReport(JFrame mainFrame, int departmentId) throws SQLException {
+        // Create a panel to hold components
+        JPanel panel = new JPanel(new BorderLayout());
+
+        // Create a table model and set up the table
+        DefaultTableModel tableModel = new DefaultTableModel(new String[]{"Course", "Employment Percentage"}, 0);
+        JTable table = new JTable(tableModel);
+
+        // Add the table to a scroll pane
+        JScrollPane scrollPane = new JScrollPane(table);
+        panel.add(scrollPane, BorderLayout.CENTER);
+
+        // Fetch the report for the selected department
+        Map<String, Double> report = generateEmploymentReport(departmentId);
+
+        // Clear the table and populate it with new data
+        tableModel.setRowCount(0);
+        if (report != null) {
+            for (Map.Entry<String, Double> entry : report.entrySet()) {
+                tableModel.addRow(new Object[]{entry.getKey(), String.format("%.2f%%", entry.getValue())});
+            }
+        }
+
+        mainFrame.getContentPane().removeAll();
+        mainFrame.add(panel);
+        mainFrame.revalidate();
+        mainFrame.repaint();
+    }
+
+    private Map<String, Double> generateEmploymentReport(int departmentId) throws SQLException {
+        dbLink db = new dbLink();
+        Connection connection = db.connectSTG();
+
+        int currentYear = java.time.Year.now().getValue();
+        int graduatedByYear = currentYear - 3;
+        int graduatedAfterYear = currentYear - 2;
+
+        String SQLString = "SELECT cd.COURSE_NAME, " +
+                "COUNT(CASE WHEN sf.ISEMPLOYED = 'Y' THEN 1 END) * 100.0 / COUNT(sf.STUDENT_ID) AS EMPLOYMENT_PERCENTAGE " +
+                "FROM STUDENT_FACT sf " +
+                "JOIN COURSES_DIMENSION cd ON sf.COURSE_ID = cd.COURSE_ID " +
+                "WHERE cd.DEPARTMENT_ID = ? AND sf.YEAR <= ? AND sf.YEAR >= ? " +
+                "GROUP BY cd.COURSE_NAME";
+
+        PreparedStatement statement = connection.prepareStatement(SQLString);
+        statement.setInt(1, departmentId);
+        statement.setInt(2, graduatedAfterYear);
+        statement.setInt(3, graduatedByYear);
+
+        ResultSet resultSet = statement.executeQuery();
+
+        Map<String, Double> report = new HashMap<>();
+        while (resultSet.next()) {
+            String courseName = resultSet.getString("COURSE_NAME");
+            double employmentPercentage = resultSet.getDouble("EMPLOYMENT_PERCENTAGE");
+
+            report.put(courseName, employmentPercentage);
+        }
+
+        return report;
     }
 
     private void showCourseDropOuts(JFrame mainFrame, int courseId) throws SQLException {
