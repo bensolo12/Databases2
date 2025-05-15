@@ -562,7 +562,7 @@ public class FrontEnd {
         return report;
     }
 
-    public Container departmentHeadContainer(){
+    public Container departmentHeadContainer() {
         Container container = new Container();
         container.setLayout(new GridLayout(3, 2));
         JButton logoutButton = new JButton("Logout");
@@ -576,6 +576,7 @@ public class FrontEnd {
         reportsComboBox.addItem("Course Drop outs per year");
         reportsComboBox.addItem("Employed Students Within 2 Years");
         reportsComboBox.addItem("Staff Employment Length");
+        reportsComboBox.addItem("Student Attendance Report");
         reportsComboBox.addActionListener(e -> {
             String selectedReport = (String) reportsComboBox.getSelectedItem();
             if ("Staff Employment Length".equals(selectedReport)) {
@@ -585,8 +586,7 @@ public class FrontEnd {
                 } catch (SQLException ex) {
                     ex.printStackTrace();
                 }
-            }
-            else if ("Course Drop outs per year".equals(selectedReport)) {
+            } else if ("Course Drop outs per year".equals(selectedReport)) {
                 container.removeAll();
                 JComboBox<String> courseComboBox = new JComboBox<>();
                 courseComboBox.addItem("Select Course");
@@ -613,33 +613,49 @@ public class FrontEnd {
                 container.add(courseComboBox);
                 container.revalidate();
                 container.repaint();
-            }
-            else if ("Module Passes By Teacher".equals(selectedReport)) {
+            } else if ("Module Passes By Teacher".equals(selectedReport)) {
                 container.removeAll();
-                //Combo box for teacher selection, with a table that shows the year and number of new students that year
-                JComboBox<String> teacherComboBox = new JComboBox<>();
-                teacherComboBox.addItem("Select Teacher");
-                try {
-                    ArrayList<Integer> teachers = getCourses();
-                    for (Integer teacher : teachers) {
-                        teacherComboBox.addItem(teacher.toString());
+
+                // Year selection with spinner
+                JSpinner yearSpinner = new JSpinner(new SpinnerNumberModel(2023, 2000, 2100, 1));
+                yearSpinner.addChangeListener(e1 -> {
+                    int selectedYear = (int) yearSpinner.getValue();
+                    JComboBox<String> teacherComboBox = new JComboBox<>();
+                    teacherComboBox.addItem("Select Teacher");
+
+                    try {
+                        ArrayList<Integer> teachers = getTeachers();
+                        for (Integer teacher : teachers) {
+                            teacherComboBox.addItem(teacher.toString());
+                        }
+                    } catch (SQLException ex) {
+                        throw new RuntimeException(ex);
                     }
-                } catch (SQLException ex) {
-                    throw new RuntimeException(ex);
-                }
-                teacherComboBox.addActionListener(event -> {
-                    String selectedTeacher = (String) teacherComboBox.getSelectedItem();
-                    if (selectedTeacher != null && !selectedTeacher.equals("Select Teacher")) {
-                        int teacherId = Integer.parseInt(selectedTeacher);
-                        showAdmissionsTable(mainFrame, teacherId);
-                    }
+
+                    teacherComboBox.addActionListener(event -> {
+                        String selectedTeacher = (String) teacherComboBox.getSelectedItem();
+                        if (selectedTeacher != null && !selectedTeacher.equals("Select Teacher")) {
+                            int teacherId = Integer.parseInt(selectedTeacher);
+                            try {
+                                showModulePassRateReport(mainFrame, selectedYear, teacherId);
+                            } catch (SQLException ex) {
+                                ex.printStackTrace();
+                            }
+                        }
+                    });
+
+                    container.add(new JLabel("Select Teacher:"));
+                    container.add(teacherComboBox);
+                    container.revalidate();
+                    container.repaint();
                 });
 
-                container.add(teacherComboBox);
+                // Add year spinner to the container
+                container.add(new JLabel("Select Year:"));
+                container.add(yearSpinner);
                 container.revalidate();
                 container.repaint();
-            }
-            else if ("Employed Students Within 2 Years".equals(selectedReport)) {
+            } else if ("Employed Students Within 2 Years".equals(selectedReport)) {
                 container.removeAll();
                 JComboBox<String> departmentComboBox = new JComboBox<>();
                 departmentComboBox.addItem("Select Department");
@@ -666,12 +682,167 @@ public class FrontEnd {
                 container.revalidate();
                 container.repaint();
             }
-        });
+            else if ("Student Attendance Report".equals(selectedReport)) {
+                container.removeAll();
+                JComboBox<String> courseComboBox = new JComboBox<>();
+                courseComboBox.addItem("Select Course");
+                try {
+                    ArrayList<Integer> courses = getCourses();
+                    for (Integer course : courses) {
+                        courseComboBox.addItem(course.toString());
+                    }
+                } catch (SQLException ex) {
+                    throw new RuntimeException(ex);
+                }
+                courseComboBox.addActionListener(event -> {
+                    String selectedCourse = (String) courseComboBox.getSelectedItem();
+                    if (selectedCourse != null && !selectedCourse.equals("Select Course")) {
+                        int courseId = Integer.parseInt(selectedCourse);
+                        try {
+                            showAttendanceReport(mainFrame, courseId);
+                        } catch (SQLException ex) {
+                            ex.printStackTrace();
+                        }
+                    }
+                });
 
+                container.add(new JLabel("Select Course:"));
+                container.add(courseComboBox);
+                container.revalidate();
+                container.repaint();
+            }
+        });
 
         container.add(reportsComboBox);
         container.add(logoutButton);
         return container;
+    }
+
+    private void showAttendanceReport(JFrame mainFrame, int courseId) throws SQLException {
+        // Create a panel to hold components
+        JPanel panel = new JPanel(new BorderLayout());
+
+        // Create a table model and set up the table
+        DefaultTableModel tableModel = new DefaultTableModel(new String[]{"Module ID", "Average Attendance (%)"}, 0);
+        JTable table = new JTable(tableModel);
+
+        // Add the table to a scroll pane
+        JScrollPane scrollPane = new JScrollPane(table);
+        panel.add(scrollPane, BorderLayout.CENTER);
+
+        // Fetch the report for the selected course
+        Map<Integer, Double> report = generateAttendanceReport(courseId);
+
+        // Clear the table and populate it with new data
+        tableModel.setRowCount(0);
+        if (report != null) {
+            for (Map.Entry<Integer, Double> entry : report.entrySet()) {
+                tableModel.addRow(new Object[]{entry.getKey(), String.format("%.2f", entry.getValue())});
+            }
+        }
+
+        mainFrame.getContentPane().removeAll();
+        mainFrame.add(panel);
+        mainFrame.revalidate();
+        mainFrame.repaint();
+    }
+
+    private Map<Integer, Double> generateAttendanceReport(int courseId) throws SQLException {
+        dbLink db = new dbLink();
+        Connection connection = db.connectSTG();
+
+        String SQLString = "SELECT sf.MODULE_ID, " +
+                "AVG(sf.ATTENDANCE) AS AVG_ATTENDANCE " +
+                "FROM STUDENT_FACT sf " +
+                "JOIN MODULES_DIMENSION md ON sf.MODULE_ID = md.MODULE_ID " +
+                "WHERE md.COURSE_ID = ? " +
+                "GROUP BY sf.MODULE_ID";
+
+        PreparedStatement statement = connection.prepareStatement(SQLString);
+        statement.setInt(1, courseId);
+
+        ResultSet resultSet = statement.executeQuery();
+
+        Map<Integer, Double> report = new HashMap<>();
+        while (resultSet.next()) {
+            int moduleId = resultSet.getInt("MODULE_ID");
+            double avgAttendance = resultSet.getDouble("AVG_ATTENDANCE");
+
+            report.put(moduleId, avgAttendance);
+        }
+
+        return report;
+    }
+
+    private void showModulePassRateReport(JFrame mainFrame, int year, int teacherId) throws SQLException {
+        // Create a panel to hold components
+        JPanel panel = new JPanel(new BorderLayout());
+
+        // Create a table model and set up the table
+        DefaultTableModel tableModel = new DefaultTableModel(new String[]{"Module ID", "Average Pass Rate (%)"}, 0);
+        JTable table = new JTable(tableModel);
+
+        // Add the table to a scroll pane
+        JScrollPane scrollPane = new JScrollPane(table);
+        panel.add(scrollPane, BorderLayout.CENTER);
+
+        // Fetch the report for the selected year and teacher
+        Map<Integer, Double> report = generateModulePassRateReport(year, teacherId);
+
+        // Clear the table and populate it with new data
+        tableModel.setRowCount(0);
+        if (report != null) {
+            for (Map.Entry<Integer, Double> entry : report.entrySet()) {
+                tableModel.addRow(new Object[]{entry.getKey(), String.format("%.2f", entry.getValue())});
+            }
+        }
+
+        mainFrame.getContentPane().removeAll();
+        mainFrame.add(panel);
+        mainFrame.revalidate();
+        mainFrame.repaint();
+    }
+
+    private Map<Integer, Double> generateModulePassRateReport(int year, int teacherId) throws SQLException {
+        dbLink db = new dbLink();
+        Connection connection = db.connectSTG();
+
+        String SQLString = "SELECT sf.MODULE_ID, " +
+                "COUNT(CASE WHEN sf.GRADE >= 40 THEN 1 END) * 100.0 / COUNT(sf.STUDENT_ID) AS PASS_RATE " +
+                "FROM STUDENT_FACT sf " +
+                "JOIN MODULES_DIMENSION md ON sf.MODULE_ID = md.MODULE_ID " +
+                "WHERE sf.YEAR = ? AND md.TEACHER_ID = ? " +
+                "GROUP BY sf.MODULE_ID";
+
+        PreparedStatement statement = connection.prepareStatement(SQLString);
+        statement.setInt(1, year);
+        statement.setInt(2, teacherId);
+
+        ResultSet resultSet = statement.executeQuery();
+
+        Map<Integer, Double> report = new HashMap<>();
+        while (resultSet.next()) {
+            int moduleId = resultSet.getInt("MODULE_ID");
+            double passRate = resultSet.getDouble("PASS_RATE");
+
+            report.put(moduleId, passRate);
+        }
+
+        return report;
+    }
+
+    private ArrayList<Integer> getTeachers() throws SQLException {
+        dbLink db = new dbLink();
+        Connection connection = db.connectSTG();
+        String SQLString = "SELECT DISTINCT TEACHER_ID FROM TEACHERS_DIMENSION";
+        PreparedStatement statement = connection.prepareStatement(SQLString);
+        ResultSet resultSet = statement.executeQuery();
+
+        ArrayList<Integer> teachers = new ArrayList<>();
+        while (resultSet.next()) {
+            teachers.add(resultSet.getInt("TEACHER_ID"));
+        }
+        return teachers;
     }
 
     private void showEmploymentReport(JFrame mainFrame, int departmentId) throws SQLException {

@@ -12,7 +12,7 @@ public class ETL {
         String StaffString = "SELECT STAFF_ID, YEAR_STARTED FROM TBLSTAFF";
         String AdmissionsString = "SELECT STUDENT_ID, COURSE_ID, YEARJOINED FROM TBLADMISSIONS";
         String DepartmentsString = "SELECT DEPARTMENT_ID, DEPARTMENT_NAME, DEPARTMENT_LEAD FROM TBLDEPARTMENTS";
-        String ModulesString = "SELECT MODULE_ID, MODULE_NAME, MODULE_TEACHER FROM TBLMODULES";
+        String ModulesString = "SELECT MODULE_ID, MODULE_NAME, COURSE_ID, MODULE_TEACHER FROM TBLMODULES";
         String StudentBooksString = "SELECT STUDENT_ID, ISONLINE, DATERETRIEVED FROM TBLSTUDENTBOOKS";
         String CoursesString = "SELECT COURSE_ID, COURSE_NAME, DEPARTMENT_ID FROM TBLCOURSES";
         String StudentGradeString = "SELECT STUDENT_ID, MODULE_ID, GRADE, YEAR, ATTENDANCE FROM TBLSTUDENTGRADES";
@@ -76,19 +76,42 @@ public class ETL {
             int moduleID = resultSet.getInt("MODULE_ID");
             String moduleName = resultSet.getString("MODULE_NAME");
             String moduleTeacher = resultSet.getString("MODULE_TEACHER");
+            int courseID = resultSet.getInt("COURSE_ID"); // Fetch COURSE_ID
 
             // Check if the module already exists
-            String checkSQL = "SELECT COUNT(*) FROM MODULES_DIMENSION WHERE MODULE_ID = ?";
+            String checkSQL = "SELECT MODULE_NAME, TEACHER_ID, COURSE_ID FROM MODULES_DIMENSION WHERE MODULE_ID = ?";
             PreparedStatement checkStatement = connection_STG.prepareStatement(checkSQL);
             checkStatement.setInt(1, moduleID);
             ResultSet checkResult = checkStatement.executeQuery();
 
-            if (checkResult.next() && checkResult.getInt(1) == 0) {
+            if (checkResult.next()) {
+                // Module exists, check for missing fields
+                String existingModuleName = checkResult.getString("MODULE_NAME");
+                String existingTeacherID = checkResult.getString("TEACHER_ID");
+                int existingCourseID = checkResult.getInt("COURSE_ID");
+
+                if (existingModuleName == null || existingModuleName.isEmpty() ||
+                    existingTeacherID == null || existingTeacherID.isEmpty() ||
+                    existingCourseID == 0) {
+                    // Update missing fields
+                    String updateSQL = "UPDATE MODULES_DIMENSION SET MODULE_NAME = ?, TEACHER_ID = ?, COURSE_ID = ? WHERE MODULE_ID = ?";
+                    PreparedStatement updateStatement = connection_STG.prepareStatement(updateSQL);
+                    updateStatement.setString(1, moduleName);
+                    updateStatement.setString(2, moduleTeacher);
+                    updateStatement.setInt(3, courseID);
+                    updateStatement.setInt(4, moduleID);
+                    updateStatement.executeUpdate();
+                    updateStatement.close();
+                }
+            } else {
                 // Module does not exist, perform the INSERT
-                PreparedStatement insertStatement = connection_STG.prepareStatement("INSERT INTO MODULES_DIMENSION (MODULE_ID, MODULE_NAME, TEACHER_ID) VALUES (?, ?, ?)");
+                PreparedStatement insertStatement = connection_STG.prepareStatement(
+                        "INSERT INTO MODULES_DIMENSION (MODULE_ID, MODULE_NAME, TEACHER_ID, COURSE_ID) VALUES (?, ?, ?, ?)"
+                );
                 insertStatement.setInt(1, moduleID);
                 insertStatement.setString(2, moduleName);
                 insertStatement.setString(3, moduleTeacher);
+                insertStatement.setInt(4, courseID); // Add COURSE_ID to the INSERT
                 insertStatement.executeUpdate();
                 insertStatement.close();
             }
