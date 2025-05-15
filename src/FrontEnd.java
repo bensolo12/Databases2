@@ -110,8 +110,11 @@ public class FrontEnd {
         ChartPanel chartPanel = new ChartPanel(lineChart);
         chartPanel.setPreferredSize(new Dimension(800, 600));
 
+        JButton backButton = backButton();
+
         mainFrame.getContentPane().removeAll();
-        mainFrame.add(chartPanel);
+        mainFrame.add(chartPanel, BorderLayout.CENTER);
+        mainFrame.add(backButton, BorderLayout.SOUTH);
         mainFrame.revalidate();
         mainFrame.repaint();
     }
@@ -270,6 +273,8 @@ public class FrontEnd {
                 tableModel.addRow(new Object[]{entry.getKey(), entry.getValue()});
             }
         }
+        JButton backButton = backButton();
+        panel.add(backButton, BorderLayout.SOUTH);
 
         mainFrame.getContentPane().removeAll();
         mainFrame.add(panel);
@@ -331,6 +336,9 @@ public class FrontEnd {
             ex.printStackTrace();
         }
 
+        JButton backButton = backButton();
+        panel.add(backButton, BorderLayout.SOUTH);
+
         frame.getContentPane().removeAll();
         frame.add(panel);
         frame.revalidate();
@@ -391,9 +399,11 @@ public class FrontEnd {
                 ex.printStackTrace();
             }
         });
+        JButton backButton = backButton();
 
 
         panel.add(yearComboBox, BorderLayout.NORTH);
+        panel.add(backButton, BorderLayout.SOUTH);
         frame.getContentPane().removeAll();
         frame.add(panel);
         frame.revalidate();
@@ -527,7 +537,9 @@ public class FrontEnd {
         // Add the chart to a panel
         ChartPanel chartPanel = new ChartPanel(lineChart);
         chartPanel.setPreferredSize(new Dimension(800, 600));
-        panel.add(chartPanel, BorderLayout.SOUTH);
+        panel.add(chartPanel, BorderLayout.CENTER);
+        JButton backButton = backButton();
+        panel.add(backButton, BorderLayout.SOUTH);
 
         // Display the panel in the main frame
         mainFrame.getContentPane().removeAll();
@@ -643,6 +655,8 @@ public class FrontEnd {
                             }
                         }
                     });
+                    JButton backButton = backButton();
+                    container.add(backButton, BorderLayout.SOUTH);
 
                     container.add(new JLabel("Select Teacher:"));
                     container.add(teacherComboBox);
@@ -678,6 +692,9 @@ public class FrontEnd {
                         }
                     }
                 });
+                JButton backButton = backButton();
+                container.add(backButton, BorderLayout.SOUTH);
+
                 container.add(departmentComboBox);
                 container.revalidate();
                 container.repaint();
@@ -705,6 +722,8 @@ public class FrontEnd {
                         }
                     }
                 });
+                JButton backButton = backButton();
+                container.add(backButton, BorderLayout.SOUTH);
 
                 container.add(new JLabel("Select Course:"));
                 container.add(courseComboBox);
@@ -740,6 +759,8 @@ public class FrontEnd {
                 tableModel.addRow(new Object[]{entry.getKey(), String.format("%.2f", entry.getValue())});
             }
         }
+        JButton backButton = backButton();
+        panel.add(backButton, BorderLayout.SOUTH);
 
         mainFrame.getContentPane().removeAll();
         mainFrame.add(panel);
@@ -796,6 +817,8 @@ public class FrontEnd {
                 tableModel.addRow(new Object[]{entry.getKey(), String.format("%.2f", entry.getValue())});
             }
         }
+        JButton backButton = backButton();
+        panel.add(backButton, BorderLayout.SOUTH);
 
         mainFrame.getContentPane().removeAll();
         mainFrame.add(panel);
@@ -867,6 +890,8 @@ public class FrontEnd {
                 tableModel.addRow(new Object[]{entry.getKey(), String.format("%.2f%%", entry.getValue())});
             }
         }
+        JButton backButton = backButton();
+        panel.add(backButton, BorderLayout.SOUTH);
 
         mainFrame.getContentPane().removeAll();
         mainFrame.add(panel);
@@ -929,6 +954,8 @@ public class FrontEnd {
                 tableModel.addRow(new Object[]{entry.getKey(), entry.getValue()});
             }
         }
+        JButton backButton = backButton();
+        panel.add(backButton, BorderLayout.SOUTH);
 
         mainFrame.getContentPane().removeAll();
         mainFrame.add(panel);
@@ -967,6 +994,9 @@ public class FrontEnd {
         // Create a panel to hold the table
         JPanel panel = new JPanel(new BorderLayout());
 
+        //Back button
+        JButton backButton = backButton();
+
         // Create the table
         DefaultTableModel tableModel = new DefaultTableModel(new String[]{"Teacher ID", "Years Employed"}, 0);
         JTable table = new JTable(tableModel);
@@ -981,12 +1011,28 @@ public class FrontEnd {
         // Add the table to a scroll pane
         JScrollPane scrollPane = new JScrollPane(table);
         panel.add(scrollPane, BorderLayout.CENTER);
+        panel.add(backButton, BorderLayout.SOUTH);
 
         // Display the panel in the main frame
         mainFrame.getContentPane().removeAll();
+
         mainFrame.add(panel);
         mainFrame.revalidate();
         mainFrame.repaint();
+    }
+
+    private JButton backButton(){
+        //Back button
+        JButton backButton = new JButton("Back");
+        backButton.addActionListener(e -> {
+            mainFrame.getContentPane().removeAll();
+            try {
+                showFrame();
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        });
+        return backButton;
     }
 
     private Map<Integer, Integer> generateStaffEmploymentLengthReport() throws SQLException {
